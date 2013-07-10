@@ -211,9 +211,14 @@ class ImagesToolkit {
 					$img_suffix = dirname($img_suffix) . '/' . basename($img_suffix, '.' . $image_ext) . '-gray.' . $image_ext;
 				}
 				
+				$folder_prefix = $this->screen['breakpoint'];
+				if ($retina) {
+					$folder_prefix .= '-@2x';
+				}
+				
 				$original_image_file = ABSPATH . $img_suffix;
-				$adapted_image_file = $this->cache_path . '/' . $this->screen['breakpoint'] . $img_suffix;
-				$adapted_url = $this->cache_url . '/' . $this->screen['breakpoint'] . $img_suffix;
+				$adapted_image_file = $this->cache_path . '/' . $folder_prefix . $img_suffix;
+				$adapted_url = $this->cache_url . '/' . $folder_prefix . $img_suffix;
 				
 				if(!file_exists($adapted_image_file)) {
 					$folder = dirname($adapted_image_file);
