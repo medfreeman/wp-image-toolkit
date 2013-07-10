@@ -26,8 +26,8 @@ License: GPL2
   
 */
 
-define("WP_IMAGE_TOOLKIT_TEXTDOMAIN", "wp-retina-adaptive-locale");
-define("WP_IMAGE_TOOLKIT_OPTIONS_GROUP", "retina_adaptive_options");
+define("WP_IMAGE_TOOLKIT_TEXTDOMAIN", "wp-image-toolkit-locale");
+define("WP_IMAGE_TOOLKIT_OPTIONS_GROUP", "wp_image_toolkit_options");
 
 // include the options panel
 require_once("plugin-options.php");
@@ -68,7 +68,7 @@ class ImagesToolkit {
         
         $this->l10n = WP_IMAGE_TOOLKIT_TEXTDOMAIN;
 		$this->options = get_option(WP_IMAGE_TOOLKIT_OPTIONS_GROUP);
-		//wp_die(print_r($this->options));
+		wp_die(print_r($this->options));
 		
 		// Load plugin text domain
 		add_action( 'init', array( $this, 'plugin_textdomain' ) );
@@ -95,13 +95,6 @@ class ImagesToolkit {
 			add_filter( 'post_thumbnail_html', array( $this, 'alter_retina_thumbnail_html' ), 100, 5 );
 			add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_thumbnails_from_retina_versions'), 99);
 		}
-		
-		/*if ($this->options['retina_images_show_in_wordpress']['enabled'] == 'on') {
-			
-			if ($this->options['generate_images_from_retina_version']) {
-				
-			}
-		}*/
         
         add_filter('apc_validattion_class_name', array( $this, 'custom_validation_class' ), 10, 2);
         
