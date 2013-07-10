@@ -68,7 +68,7 @@ class ImagesToolkit {
         
         $this->l10n = WP_IMAGE_TOOLKIT_TEXTDOMAIN;
 		$this->options = get_option(WP_IMAGE_TOOLKIT_OPTIONS_GROUP);
-		wp_die(print_r($this->options));
+		//wp_die(print_r($this->options));
 		
 		// Load plugin text domain
 		add_action( 'init', array( $this, 'plugin_textdomain' ) );
