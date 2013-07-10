@@ -249,12 +249,29 @@ class ImagesToolkit {
 		}
 			
 		if ($retina || $adapted) {
-			$html = preg_replace("/width=\"[0-9]*\"/", "width=\"".$html_width."\"", $html);
-			$html = preg_replace("/height=\"[0-9]*\"/", "height=\"".$html_height."\"", $html);
+			$html = $this->replace_imgs_tags($html, false, $html_width, $html_height);
 		}
 		if ($adapted) {
-			$html = preg_replace("!(<img[^>]+src\s*=\s*['\"])([^'\"]+)(['\"][^>]*>)!i", "$1" . $adapted_url . "$3", $html);
+			$html = $this->replace_imgs_tags($html, $adapted_url);
 		}
+		return $html;
+	}
+	
+	private function replace_imgs_tags($html, $src = false, $width = false, $height = false) {
+		$html = str_get_html($html);
+		
+		foreach($html->find('img') as $img_tag) {
+			if ($src) {
+				$img_tag->src = $src;
+			}
+			if ($width) {
+				$img_tag->width = $width;
+			}
+			if ($height) {
+				$img_tag->height = $height;
+			}
+		}
+		
 		return $html;
 	}
 	
