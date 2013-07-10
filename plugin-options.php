@@ -8,10 +8,10 @@
    */
   $config = array(    
     'menu'           => 'settings',             //sub page to settings page
-    'page_title'     => __('Retina Adaptive Images', WP_RETINA_ADAPTIVE_TEXTDOMAIN),       //The name of this page 
+    'page_title'     => __('Wordpress Image Toolkit', WP_RETINA_ADAPTIVE_TEXTDOMAIN),       //The name of this page 
     'capability'     => 'update_core',         // The capability needed to view the page 
-    'option_group'   => WP_RETINA_ADAPTIVE_OPTIONS_GROUP,       //the name of the option to create in the database
-    'id'             => 'retina_adaptive_admin_page',            // meta box id, unique per page
+    'option_group'   => WP_IMAGE_TOOLKIT_OPTIONS_GROUP,       //the name of the option to create in the database
+    'id'             => 'wp_image_toolkit_admin_page',            // meta box id, unique per page
     'fields'         => array(),            // list of fields (can be added by field arrays)
     'local_images'   => true,          // Use local or hosted images (meta box images for add/remove)
     'use_with_theme' => false          //change path if used with theme set to true, false for a plugin or anything else for a custom path(default false).
@@ -30,7 +30,8 @@
     'links' => array(
       'options_1' =>  __('Adaptive Images',WP_RETINA_ADAPTIVE_TEXTDOMAIN),
       'options_2' =>  __('Retina Images',WP_RETINA_ADAPTIVE_TEXTDOMAIN),
-      'options_3' =>  __('Import Export',WP_RETINA_ADAPTIVE_TEXTDOMAIN),
+      'options_3' =>  __('Grayscale Images',WP_RETINA_ADAPTIVE_TEXTDOMAIN),
+      'options_4' =>  __('Import Export',WP_RETINA_ADAPTIVE_TEXTDOMAIN),
     )
   ));
   
@@ -105,7 +106,7 @@
   /**
    * Open admin page import / export tab
    */
-  $options_panel->OpenTab('options_3');
+  $options_panel->OpenTab('options_4');
   
   //title
   $options_panel->Title(__("Import Export",WP_RETINA_ADAPTIVE_TEXTDOMAIN));
