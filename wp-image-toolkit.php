@@ -81,9 +81,6 @@ class ImagesToolkit {
 		
 		$this->image_is_grayscale = false;
 		
-		
-		add_action( 'wp_head', array( $this, 'set_resolution_cookie' ) );
-		
 		if ($this->options['enable_grayscale']) {
 			add_filter( 'post_thumbnail_size', array( $this, 'apply_grayscale_thumbnail' ), 99 );
 			add_filter( 'post_thumbnail_html', array( $this, 'alter_grayscale_thumbnail_html' ), 99, 5 );
@@ -91,7 +88,8 @@ class ImagesToolkit {
 			add_action( 'delete_attachment', array( $this, 'delete_grayscale_images'));
 		}
 		
-		if ($this->options['enable_retina']) {
+		if ($this->options['enable_retina'] || $this->options['enable_adaptive']) {
+			add_action( 'wp_head', array( $this, 'set_resolution_cookie' ) );
 			add_action( 'after_setup_theme', array( $this, 'add_retina_images_sizes' ), 100 );
 			add_filter( 'post_thumbnail_size', array( $this, 'select_retina_thumbnail' ), 100 );
 			add_filter( 'post_thumbnail_html', array( $this, 'alter_retina_thumbnail_html' ), 100, 5 );
@@ -438,7 +436,7 @@ class ImagesToolkit {
 	 *---------------------------------------------*/
 	
 	public function custom_validation_class($validationClassName,$obj){
-		if ($obj->_Page_Config[option_group] == WP_RETINA_ADAPTIVE_OPTIONS_GROUP) {
+		if ($obj->_Page_Config[option_group] == WP_IMAGE_TOOLKIT_OPTIONS_GROUP) {
 			require_once("includes/apc_custom_validation.class.php");
 			return 'apc_custom_validation';
 		}
