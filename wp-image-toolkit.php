@@ -68,7 +68,7 @@ class ImagesToolkit {
         
         $this->l10n = WP_IMAGE_TOOLKIT_TEXTDOMAIN;
 		$this->options = get_option(WP_IMAGE_TOOLKIT_OPTIONS_GROUP);
-		//wp_die(print_r($this->options));
+		wp_die(print_r($this->options));
 		
 		// Load plugin text domain
 		add_action( 'init', array( $this, 'plugin_textdomain' ) );
@@ -84,10 +84,12 @@ class ImagesToolkit {
 		
 		add_action( 'wp_head', array( $this, 'set_resolution_cookie' ) );
 		
-		add_filter( 'post_thumbnail_size', array( $this, 'apply_grayscale_thumbnail' ), 99 );
-		add_filter( 'post_thumbnail_html', array( $this, 'alter_grayscale_thumbnail_html' ), 99, 5 );
-		add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_grayscale_images'), 100);
-		add_action( 'delete_attachment', array( $this, 'delete_grayscale_images'));
+		if ($this->options['enable_grayscale']) {
+			add_filter( 'post_thumbnail_size', array( $this, 'apply_grayscale_thumbnail' ), 99 );
+			add_filter( 'post_thumbnail_html', array( $this, 'alter_grayscale_thumbnail_html' ), 99, 5 );
+			add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_grayscale_images'), 100);
+			add_action( 'delete_attachment', array( $this, 'delete_grayscale_images'));
+		}
 		
 		if ($this->options['enable_retina']) {
 			add_action( 'after_setup_theme', array( $this, 'add_retina_images_sizes' ), 100 );
@@ -125,7 +127,7 @@ class ImagesToolkit {
 	 * @param	boolean	$network_wide	True if WPMU superadmin uses "Network Activate" action, false if WPMU is disabled or plugin is activated on an individual blog 
 	 */
 	public function uninstall( $network_wide ) {
-		delete_option(WP_RETINA_ADAPTIVE_OPTIONS_GROUP);
+		delete_option(WP_IMAGE_TOOLKIT_OPTIONS_GROUP);
 	} // end uninstall
 
 	/**
