@@ -42,12 +42,16 @@ class ImagesToolkit {
 	
 	private $plugin_path;
     private $plugin_url;
+    private $wp_url;
+    
     private $options;
     private $resolutions;
     private $screen;
+    
     private $cache_path;
     private $cache_url;
-    private $wp_url;
+    
+    private $image_is_grayscale;
 	 
 	/*--------------------------------------------*
 	 * Constructor
@@ -60,6 +64,8 @@ class ImagesToolkit {
 		
 		$this->plugin_path = plugin_dir_path( __FILE__ );
         $this->plugin_url = plugin_dir_url( __FILE__ );
+        $this->wp_url = get_bloginfo('wpurl');
+        
         $this->l10n = WP_IMAGE_TOOLKIT_TEXTDOMAIN;
 		$this->options = get_option(WP_IMAGE_TOOLKIT_OPTIONS_GROUP);
 		//wp_die(print_r($this->options));
@@ -68,15 +74,20 @@ class ImagesToolkit {
 		add_action( 'init', array( $this, 'plugin_textdomain' ) );
 		
 		$this->resolutions = explode(',', $this->options['breakpoints']);
-		
 		$this->screen = get_screen_properties($this->resolutions);
-		
-		$this->wp_url = get_bloginfo('wpurl');
 		
 		$this->cache_path = ABSPATH . '/' . $this->options['cache_path'];
 		$this->cache_url = $this->wp_url . '/' . $this->options['cache_path'];
 		
+		$this->image_is_grayscale = false;
+		
+		
 		add_action( 'wp_head', array( $this, 'set_resolution_cookie' ) );
+		
+		add_filter( 'post_thumbnail_size', array( $this, 'apply_grayscale_thumbnail' ), 99 );
+		add_filter( 'post_thumbnail_html', array( $this, 'alter_grayscale_thumbnail_html' ), 99, 5 );
+		add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_grayscale_images'), 100);
+		add_action( 'delete_attachment', array( $this, 'delete_grayscale_images'));
 		
 		if ($this->options['enable_retina']) {
 			add_action( 'after_setup_theme', array( $this, 'add_retina_images_sizes' ), 100 );
@@ -203,7 +214,7 @@ class ImagesToolkit {
 				$img_suffix = substr($url, $pos + mb_strlen($this->wp_url));
 				$image_ext = strtolower(pathinfo($img_suffix, PATHINFO_EXTENSION));
 				
-				if (function_exists('image_is_grayscale') && image_is_grayscale()) {
+				if ($this->image_is_grayscale) {
 					$img_suffix = dirname($img_suffix) . '/' . basename($img_suffix, '.' . $image_ext) . '-gray.' . $image_ext;
 				}
 				
@@ -297,6 +308,119 @@ class ImagesToolkit {
 		}
 		return $meta;
 	}
+	
+	/*--------------------------------------------*
+	 * Detect grayscale thumbnail, replace size by standard one
+	 *---------------------------------------------*/
+	
+	public function apply_grayscale_thumbnail($size) {
+		$this->image_is_grayscale = false;
+		$grayscale_suffix = strpos($size, '-gray');
+		if ($grayscale_suffix !== false) {
+			$size = substr($size, 0, $grayscale_suffix);
+			$this->image_is_grayscale = true;
+		}
+		return $size;
+	} // end apply_grayscale_thumbnail
+	
+	/*--------------------------------------------*
+	 * When grayscale thumbnail is selected, change back html dimensions of images to original image size
+	 *---------------------------------------------*/
+	
+	public function alter_grayscale_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr) {
+		if($this->image_is_grayscale) {
+			preg_match("/(.*)<img(.*)src=\"([^\"]+)\"(.*)\/>(.*)/i", $html, $matches);
+			$standard_image_file = $matches[3];
+			$extension = pathinfo($standard_image_file, PATHINFO_EXTENSION);
+			$grayscale_image_file = trailingslashit(dirname($standard_image_file)) . basename($standard_image_file, '.' . $extension) . '-gray.' . $extension;
+			$html = $matches[1] . '<img' . $matches[2] . 'src="' . $grayscale_image_file . '"'.  $matches[4] . '/>' . $matches[5];
+		}
+		return $html;
+	} // end alter_grayscale_thumbnail_html
+	
+	/*--------------------------------------------*
+	 * Generate grayscale images on media manager upload
+	 *---------------------------------------------*/
+	
+	public function generate_grayscale_images($meta) {
+		$sizes = $this->get_images_sizes_files($meta);
+		
+		$upload_dir = wp_upload_dir();
+		$path = trailingslashit($upload_dir['basedir']).trailingslashit(dirname($meta['file']));
+		
+		foreach($sizes as $size => $image_file) {
+				if(file_exists($image_file)) {
+					$extension = pathinfo($image_file, PATHINFO_EXTENSION);
+					$grayscale_image_file = $path . basename($image_file, '.' . $extension) . '-gray.' . $extension;
+					
+					list($orig_w, $orig_h, $orig_type) = getimagesize($image_file);
+					
+					$image = wp_load_image($image_file);
+					
+					$grayscale_image = $image;
+					imagefilter($grayscale_image, IMG_FILTER_GRAYSCALE);
+					
+					switch ($orig_type) {
+						case IMAGETYPE_GIF:
+							imagegif( $grayscale_image, $grayscale_image_file );
+							break;
+						case IMAGETYPE_PNG:
+							imagepng( $grayscale_image, $grayscale_image_file );
+							break;
+						case IMAGETYPE_JPEG:
+							imagejpeg( $grayscale_image, $grayscale_image_file );
+							break;
+					}
+				}
+		}
+		return $meta;
+	} // end generate_grayscale_images
+		
+	/*--------------------------------------------*
+	 * Delete grayscale images when deleting image from media browser
+	 *---------------------------------------------*/
+	 
+	public function delete_grayscale_images($attachment_id) {
+		if (wp_attachment_is_image($attachment_id)) {
+			$meta = wp_get_attachment_metadata($attachment_id);
+			
+			$sizes = $this->get_images_sizes_files($meta);
+			
+			$upload_dir = wp_upload_dir();
+			$path = trailingslashit($upload_dir['basedir']).trailingslashit(dirname($meta['file']));
+		
+			foreach($sizes as $size => $image_file) {
+				$extension = pathinfo($image_file, PATHINFO_EXTENSION);
+				$grayscale_image_file = $path . basename($image_file, '.' . $extension) . '-gray.' . $extension;
+				if (file_exists($grayscale_image_file)) {
+					unlink($grayscale_image_file);
+				}
+			}
+		}
+	} // end delete_grayscale_images
+	
+	/*--------------------------------------------*
+	 * Get images sizes and file path
+	 *---------------------------------------------*/
+	 
+	function get_images_sizes_files($meta) {
+		$upload_dir = wp_upload_dir();
+		
+		$sizes = array();
+		$sizes = array_keys($meta['sizes']);
+		
+		$path = trailingslashit($upload_dir['basedir']).trailingslashit(dirname($meta['file']));
+		
+		$all_sizes = array();
+		foreach($sizes as $size) {
+			$image_file = $path . $meta['sizes'][$size]['file'];
+			$all_sizes[$size] = $image_file;
+		}
+		
+		$all_sizes['full'] = $upload_dir['basedir'] . '/' . $meta['file'];
+		
+		return $all_sizes;
+	} // end get_images_sizes_files
 	
 	/*--------------------------------------------*
 	 * Get dimensions of given image size
