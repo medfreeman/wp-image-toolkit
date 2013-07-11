@@ -47,6 +47,7 @@ class ImagesToolkit {
     private $options;
     private $resolutions;
     private $screen;
+    private $retina_display;
     
     private $cache_path;
     private $cache_url;
@@ -76,6 +77,8 @@ class ImagesToolkit {
 		$this->resolutions = explode(',', $this->options['breakpoints']);
 		$this->screen = get_screen_properties($this->resolutions);
 		
+		$this->retina_display = ($this->screen['pixel_density'] >= 1.5);
+		
 		$this->cache_path = ABSPATH . '/' . $this->options['cache_path'];
 		$this->cache_url = $this->wp_url . '/' . $this->options['cache_path'];
 		
@@ -92,6 +95,7 @@ class ImagesToolkit {
 			add_action( 'wp_head', array( $this, 'set_resolution_cookie' ) );
 			add_action( 'after_setup_theme', array( $this, 'add_retina_images_sizes' ), 100 );
 			add_filter( 'post_thumbnail_html', array( $this, 'alter_thumbnail_html' ), 100, 5 );
+			add_filter( 'the_content', array( $this, 'process_html_imgs' ), 100 );
 			add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_thumbnails_from_retina_versions'), 99);
 		}
         
@@ -163,13 +167,6 @@ class ImagesToolkit {
 	 *---------------------------------------------*/
 	
 	public function alter_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr) {
-		$retina = false;
-		$adapted = false;
-		
-		if ($this->screen['pixel_density'] > 1) {
-			$retina = true;
-		}
-		
 		$imgdata = wp_get_attachment_image_src( $post_thumbnail_id, $size );
 		$url = $imgdata[0];
 		$html_width = $imgdata[1];
@@ -179,89 +176,131 @@ class ImagesToolkit {
 		
 		/* TODO: Add a correspondence table to perfectly control images sizes depending on the context */
 		/* TODO: Switch / Find correspondences in available wordpress images formats */
-		if($html_width > $this->screen['breakpoint']) {
-			$adapted = true;
-			
-			$tmp_width = $this->screen['breakpoint'];
-			$tmp_height = round($tmp_width * $html_height / $html_width);
-			
-			$new_width = $tmp_width * $this->screen['pixel_density'];
-			$new_height = $tmp_height * $this->screen['pixel_density'];
-			
-			$img_suffix = $this->get_relative_path_from_url($url);
-			
-			$image_ext = strtolower(pathinfo($img_suffix, PATHINFO_EXTENSION));
-			
-			if ($this->image_is_grayscale) {
-				$img_suffix = $this->get_grayscale_image($img_suffix);
-			}
-			
-			$folder_prefix = $this->screen['breakpoint'];
-			if ($retina) {
-				$folder_prefix .= '-@2x';
-			}
-			
-			$original_image_file = ABSPATH . $img_suffix;
-			$adapted_image_file = $this->cache_path . '/' . $folder_prefix . $img_suffix;
-			$adapted_url = $this->cache_url . '/' . $folder_prefix . $img_suffix;
-			
-			if(!file_exists($adapted_image_file)) {
-				$folder = dirname($adapted_image_file);
-				if(!file_exists($folder)) {
-					if(!mkdir($folder, 0777, true)) {
-						return $html;
-					}
-				}					
-				
-				/* TODO: replace by wordpress new image manipulation functions : wp_get_image_editor */
-				$original_image = wp_load_image($original_image_file);
-				$adapted_image = imagecreatetruecolor($new_width, $new_height);
-				
-				/* TODO: return original image if requested dimensions are higher than its size */
-				imagecopyresampled($adapted_image , $original_image, 0, 0, 0, 0, $new_width, $new_height, $html_width, $html_height);
-				
-				switch ($image_ext) {
-					case 'gif':
-						imagegif( $adapted_image, $adapted_image_file );
-						break;
-					case 'png':
-						imagepng( $adapted_image, $adapted_image_file );
-						break;
-					case 'jpg':
-					case 'jpeg':
-						imagejpeg( $adapted_image, $adapted_image_file );
-						break;
-				}
-				
-				imagedestroy($original_image);
-				imagedestroy($adapted_image);
-			}
-			$html_width = $tmp_width;
-			$html_height = $tmp_height;
-		} else if ($retina) {
+		
+		$adapted_image = $this->get_adapted_image($url, $html_width, $html_height);
+		if ($adapted_image) {
+			$url = $adapted_image['url'];
+			$html_width = $adapted_image['html_width'];
+			$html_height = $adapted_image['html_height'];
+		} else if ($this->retina_display) {
 			$imgdata = wp_get_attachment_image_src( $post_thumbnail_id, $size . '-@2x' );
-			$adapted_url = $imgdata[0];
+			$url = $imgdata[0];
 			if ($this->image_is_grayscale) {
-				$adapted_url = $this->get_grayscale_image($adapted_url);
+				$url = $this->get_grayscale_image($url);
 			}
 		}
 			
-		if ($retina || $adapted) {
-			$html = $this->replace_img_tags($html, false, $html_width, $html_height);
-			$html = $this->replace_img_tags($html, $adapted_url);
+		if ($this->retina_display || $adapted_image) {
+			$html = str_get_html($html);
+			$html = $this->replace_img_tags($html->find('img', 0), $url, $html_width, $html_height);
 		}
 		return $html;
 	}
 	
-	private function process_html_imgs($html) {
+	public function process_html_imgs($html) {
 		$html = str_get_html($html);
 		
 		foreach($html->find('img') as $img_tag) {
+			if (!isset($img_tag->src)) {
+				continue;
+			}
 			
+			$url = $img_tag->src;
+			$original_image_file = ABSPATH . $this->get_relative_path_from_url($url);
+			$imgdata = getimagesize($original_image_file);
+			
+			$orig_width = $imgdata[0];
+			$orig_height = $imgdata[1];
 			
 			$html_width = isset($img_tag->width) ? $img_tag->width : $orig_width;
 			$html_height = isset($img_tag->height) ? $img_tag->height : $orig_height;
+			
+			$adapted_image = $this->get_adapted_image($url, $html_width, $html_height);
+			if ($adapted_image) {
+				$img_tag = $this->replace_img_tags($img_tag, $adapted_image['url'], $adapted_image['html_width'], $adapted_image['html_height']);
+			}
 		}
+		
+		return $html;
+	}
+	
+	private function get_adapted_image($original_url, $original_width, $original_height) {
+		if($original_width <= $this->screen['breakpoint']) {
+			return false;
+		}
+			
+		$html_width = $this->screen['breakpoint'];
+		$html_height = round($html_width * $original_height / $original_width);
+		
+		$new_width = $html_width;
+		$new_height = $html_height;
+		
+		$folder_prefix = $this->screen['breakpoint'];
+		if ($this->retina_display) {
+			die();
+			$folder_prefix .= '-@2x';
+			$new_width = $new_width * 2;
+			$new_height = $new_height * 2;
+		}
+		
+		$new_width = $html_width * $this->screen['pixel_density'];
+		$new_height = $html_height * $this->screen['pixel_density'];
+		
+		$img_suffix = $this->get_relative_path_from_url($original_url);
+		
+		if ($this->image_is_grayscale) {
+			$img_suffix = $this->get_grayscale_image($img_suffix);
+		}
+		
+		$original_image_file = ABSPATH . $img_suffix;
+		$adapted_image_file = $this->cache_path . '/' . $folder_prefix . $img_suffix;
+		$adapted_url = $this->cache_url . '/' . $folder_prefix . $img_suffix;
+		
+		if(!file_exists($adapted_image_file)) {
+			$folder = dirname($adapted_image_file);
+			if(!file_exists($folder)) {
+				if(!mkdir($folder, 0777, true)) {
+					return $html;
+				}
+			}					
+			
+			if(!$this->create_resampled_image($original_image_file, $original_width, $original_height, $adapted_image_file, $new_width, $new_height)) {
+				return $html;
+			}
+		}
+		
+		return array('url' => $adapted_url, 'html_width' => $html_width, 'html_height' => $html_height);
+	}
+	
+	private function create_resampled_image($original_image_path, $original_width, $original_height, $new_image_path, $new_width, $new_height) {
+		/* TODO: replace by wordpress new image manipulation functions : wp_get_image_editor */
+		$original_image = wp_load_image($original_image_path);
+		$new_image = imagecreatetruecolor($new_width, $new_height);
+		
+		$image_ext = strtolower(pathinfo($original_image_path, PATHINFO_EXTENSION));
+		
+		/* TODO: return original image if requested dimensions are higher than its size */
+		if(!imagecopyresampled($new_image , $original_image, 0, 0, 0, 0, $new_width, $new_height, $original_width, $original_height)) {
+			return false;
+		}
+		
+		switch ($image_ext) {
+			case 'gif':
+				imagegif( $new_image, $new_image_path );
+				break;
+			case 'png':
+				imagepng( $new_image, $new_image_path );
+				break;
+			case 'jpg':
+			case 'jpeg':
+				imagejpeg( $new_image, $new_image_path );
+				break;
+		}
+		
+		imagedestroy($original_image);
+		imagedestroy($new_image);
+		
+		return $new_image_path;
 	}
 	
 	private function get_relative_path_from_url($url) {
@@ -279,11 +318,7 @@ class ImagesToolkit {
 		return $grayscale_image_url;
 	}
 	
-	private function replace_img_tags($html, $src = false, $width = false, $height = false) {
-		$html = str_get_html($html);
-		
-		$img_tag = $html->find('img', 0);
-		
+	private function replace_img_tags($img_tag, $src = false, $width = false, $height = false) {
 		if ($src) {
 			$img_tag->src = $src;
 		}
@@ -294,7 +329,7 @@ class ImagesToolkit {
 			$img_tag->height = $height;
 		}
 		
-		return $html;
+		return $img_tag;
 	}
 	
 	/*--------------------------------------------*
