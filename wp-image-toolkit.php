@@ -91,12 +91,15 @@ class ImagesToolkit {
 		if ($this->options['enable_retina'] || $this->options['enable_adaptive']) {
 			add_action( 'wp_head', array( $this, 'set_resolution_cookie' ) );
 			add_action( 'after_setup_theme', array( $this, 'add_retina_images_sizes' ), 100 );
-			add_filter( 'post_thumbnail_size', array( $this, 'select_retina_thumbnail' ), 100 );
-			add_filter( 'post_thumbnail_html', array( $this, 'alter_retina_thumbnail_html' ), 100, 5 );
+			add_filter( 'post_thumbnail_html', array( $this, 'alter_thumbnail_html' ), 100, 5 );
 			add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_thumbnails_from_retina_versions'), 99);
 		}
         
-        add_filter('apc_validattion_class_name', array( $this, 'custom_validation_class' ), 10, 2);
+        if (is_admin()) {
+			add_filter('apc_validattion_class_name', array( $this, 'custom_validation_class' ), 10, 2);
+		} else {
+			require_once("includes/simple_html_dom.php");
+		}
         
         if (is_admin()) { // note the use of is_admin() to double check that this is happening in the admin
 			$config = array(
@@ -113,10 +116,7 @@ class ImagesToolkit {
 				'access_token' => '' // Access private repositories by authorizing under Appearance > Github Updates when this example plugin is installed
 			);
 			new WP_GitHub_Updater($config);
-		} else {
-			require_once("includes/simple_html_dom.php");
 		}
-		
 	} // end constructor
 	
 	/**
@@ -157,30 +157,17 @@ class ImagesToolkit {
 		}
 	} // end add_retina_images_sizes
 	
-	/*--------------------------------------------*
-	 * Select retina thumbnail when appropriate, in place of standard image
-	 *---------------------------------------------*/
-	
-	public function select_retina_thumbnail($size) {
-		if ($this->screen['pixel_density'] > 1) {
-			return $size . '-@2x';
-		}
-		return $size;
-	} // end select_retina_thumbnail
-	
 	
 	/*--------------------------------------------*
 	 * When retina thumbnail is selected, change back html dimensions of images to original image size
 	 *---------------------------------------------*/
 	
-	public function alter_retina_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr) {
+	public function alter_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr) {
 		$retina = false;
 		$adapted = false;
 		
-		$retina_suffix = strpos($size, '-@2x');
-		if ($retina_suffix !== false) {
+		if ($this->screen['pixel_density'] > 1) {
 			$retina = true;
-			$size = substr($size, 0, $retina_suffix);
 		}
 		
 		$imgdata = wp_get_attachment_image_src( $post_thumbnail_id, $size );
@@ -189,7 +176,6 @@ class ImagesToolkit {
 		$html_height = $imgdata[2];
 		
 		/* TODO: Same for post images */
-		/* TODO: Add html library simplehtmldom */
 		
 		/* TODO: Add a correspondence table to perfectly control images sizes depending on the context */
 		/* TODO: Switch / Find correspondences in available wordpress images formats */
@@ -202,79 +188,110 @@ class ImagesToolkit {
 			$new_width = $tmp_width * $this->screen['pixel_density'];
 			$new_height = $tmp_height * $this->screen['pixel_density'];
 			
-			$pos = strpos($url, $this->wp_url);
-			if($pos !== false) {
-				$img_suffix = substr($url, $pos + mb_strlen($this->wp_url));
-				$image_ext = strtolower(pathinfo($img_suffix, PATHINFO_EXTENSION));
-				
-				if ($this->image_is_grayscale) {
-					$img_suffix = dirname($img_suffix) . '/' . basename($img_suffix, '.' . $image_ext) . '-gray.' . $image_ext;
-				}
-				
-				$folder_prefix = $this->screen['breakpoint'];
-				if ($retina) {
-					$folder_prefix .= '-@2x';
-				}
-				
-				$original_image_file = ABSPATH . $img_suffix;
-				$adapted_image_file = $this->cache_path . '/' . $folder_prefix . $img_suffix;
-				$adapted_url = $this->cache_url . '/' . $folder_prefix . $img_suffix;
-				
-				if(!file_exists($adapted_image_file)) {
-					$folder = dirname($adapted_image_file);
-					if(!file_exists($folder)) {
-						if(!mkdir($folder, 0777, true)) {
-							return $html;
-						}
-					}					
-					
-					/* TODO: replace by wordpress new image manipulation functions : wp_get_image_editor */
-					$original_image = wp_load_image($original_image_file);
-					$adapted_image = imagecreatetruecolor($new_width, $new_height);
-					
-					/* TODO: return original image if requested dimensions are higher than its size */
-					imagecopyresampled($adapted_image , $original_image, 0, 0, 0, 0, $new_width, $new_height, $html_width, $html_height);
-					
-					switch ($image_ext) {
-						case 'gif':
-							imagegif( $adapted_image, $adapted_image_file );
-							break;
-						case 'png':
-							imagepng( $adapted_image, $adapted_image_file );
-							break;
-						case 'jpg':
-						case 'jpeg':
-							imagejpeg( $adapted_image, $adapted_image_file );
-							break;
+			$img_suffix = $this->get_relative_path_from_url($url);
+			
+			$image_ext = strtolower(pathinfo($img_suffix, PATHINFO_EXTENSION));
+			
+			if ($this->image_is_grayscale) {
+				$img_suffix = $this->get_grayscale_image($img_suffix);
+			}
+			
+			$folder_prefix = $this->screen['breakpoint'];
+			if ($retina) {
+				$folder_prefix .= '-@2x';
+			}
+			
+			$original_image_file = ABSPATH . $img_suffix;
+			$adapted_image_file = $this->cache_path . '/' . $folder_prefix . $img_suffix;
+			$adapted_url = $this->cache_url . '/' . $folder_prefix . $img_suffix;
+			
+			if(!file_exists($adapted_image_file)) {
+				$folder = dirname($adapted_image_file);
+				if(!file_exists($folder)) {
+					if(!mkdir($folder, 0777, true)) {
+						return $html;
 					}
+				}					
+				
+				/* TODO: replace by wordpress new image manipulation functions : wp_get_image_editor */
+				$original_image = wp_load_image($original_image_file);
+				$adapted_image = imagecreatetruecolor($new_width, $new_height);
+				
+				/* TODO: return original image if requested dimensions are higher than its size */
+				imagecopyresampled($adapted_image , $original_image, 0, 0, 0, 0, $new_width, $new_height, $html_width, $html_height);
+				
+				switch ($image_ext) {
+					case 'gif':
+						imagegif( $adapted_image, $adapted_image_file );
+						break;
+					case 'png':
+						imagepng( $adapted_image, $adapted_image_file );
+						break;
+					case 'jpg':
+					case 'jpeg':
+						imagejpeg( $adapted_image, $adapted_image_file );
+						break;
 				}
-				$html_width = $tmp_width;
-				$html_height = $tmp_height;
+				
+				imagedestroy($original_image);
+				imagedestroy($adapted_image);
+			}
+			$html_width = $tmp_width;
+			$html_height = $tmp_height;
+		} else if ($retina) {
+			$imgdata = wp_get_attachment_image_src( $post_thumbnail_id, $size . '-@2x' );
+			$adapted_url = $imgdata[0];
+			if ($this->image_is_grayscale) {
+				$adapted_url = $this->get_grayscale_image($adapted_url);
 			}
 		}
 			
 		if ($retina || $adapted) {
-			$html = $this->replace_imgs_tags($html, false, $html_width, $html_height);
-		}
-		if ($adapted) {
-			$html = $this->replace_imgs_tags($html, $adapted_url);
+			$html = $this->replace_img_tags($html, false, $html_width, $html_height);
+			$html = $this->replace_img_tags($html, $adapted_url);
 		}
 		return $html;
 	}
 	
-	private function replace_imgs_tags($html, $src = false, $width = false, $height = false) {
+	private function process_html_imgs($html) {
 		$html = str_get_html($html);
 		
 		foreach($html->find('img') as $img_tag) {
-			if ($src) {
-				$img_tag->src = $src;
-			}
-			if ($width) {
-				$img_tag->width = $width;
-			}
-			if ($height) {
-				$img_tag->height = $height;
-			}
+			
+			
+			$html_width = isset($img_tag->width) ? $img_tag->width : $orig_width;
+			$html_height = isset($img_tag->height) ? $img_tag->height : $orig_height;
+		}
+	}
+	
+	private function get_relative_path_from_url($url) {
+		$pos = strpos($url, $this->wp_url);
+		if($pos === false) {
+			return false;
+		}
+		$suffix = substr($url, $pos + mb_strlen($this->wp_url));
+		return $suffix;
+	}
+	
+	private function get_grayscale_image($url) {
+		$image_ext = strtolower(pathinfo($url, PATHINFO_EXTENSION));
+		$grayscale_image_url = dirname($url) . '/' . basename($url, '.' . $image_ext) . '-gray.' . $image_ext;
+		return $grayscale_image_url;
+	}
+	
+	private function replace_img_tags($html, $src = false, $width = false, $height = false) {
+		$html = str_get_html($html);
+		
+		$img_tag = $html->find('img', 0);
+		
+		if ($src) {
+			$img_tag->src = $src;
+		}
+		if ($width) {
+			$img_tag->width = $width;
+		}
+		if ($height) {
+			$img_tag->height = $height;
 		}
 		
 		return $html;
