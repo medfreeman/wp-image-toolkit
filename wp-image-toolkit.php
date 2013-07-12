@@ -190,12 +190,15 @@ class ImagesToolkit {
 			
 		if ($this->retina_display || $adapted_image) {
 			$html = str_get_html($html);
-			$html = $this->replace_img_tags($html->find('img', 0), $url, $html_width, $html_height);
+			$html = $this->replace_img_tags($html, $url, $html_width, $html_height);
 		}
 		return $html;
 	}
 	
 	public function process_html_imgs($html) {
+		if(empty($html)) {
+			return $html;
+		}
 		$html = str_get_html($html);
 		
 		foreach($html->find('img') as $img_tag) {
@@ -235,7 +238,6 @@ class ImagesToolkit {
 		
 		$folder_prefix = $this->screen['breakpoint'];
 		if ($this->retina_display) {
-			die();
 			$folder_prefix .= '-@2x';
 			$new_width = $new_width * 2;
 			$new_height = $new_height * 2;
@@ -262,7 +264,7 @@ class ImagesToolkit {
 				}
 			}					
 			
-			if(!$this->create_resampled_image($original_image_file, $original_width, $original_height, $adapted_image_file, $new_width, $new_height)) {
+			if(!$this->create_resampled_image($original_image_file, $adapted_image_file, $new_width, $new_height)) {
 				return $html;
 			}
 		}
@@ -270,33 +272,12 @@ class ImagesToolkit {
 		return array('url' => $adapted_url, 'html_width' => $html_width, 'html_height' => $html_height);
 	}
 	
-	private function create_resampled_image($original_image_path, $original_width, $original_height, $new_image_path, $new_width, $new_height) {
-		/* TODO: replace by wordpress new image manipulation functions : wp_get_image_editor */
-		$original_image = wp_load_image($original_image_path);
-		$new_image = imagecreatetruecolor($new_width, $new_height);
-		
-		$image_ext = strtolower(pathinfo($original_image_path, PATHINFO_EXTENSION));
-		
-		/* TODO: return original image if requested dimensions are higher than its size */
-		if(!imagecopyresampled($new_image , $original_image, 0, 0, 0, 0, $new_width, $new_height, $original_width, $original_height)) {
-			return false;
+	private function create_resampled_image($original_image_path, $new_image_path, $new_width, $new_height) {
+		$original_image = wp_get_image_editor( $original_image_path );
+		if ( !is_wp_error( $original_image ) ) {
+			$original_image->resize( $new_width, $new_height, false );
+			$original_image->save( $new_image_path );
 		}
-		
-		switch ($image_ext) {
-			case 'gif':
-				imagegif( $new_image, $new_image_path );
-				break;
-			case 'png':
-				imagepng( $new_image, $new_image_path );
-				break;
-			case 'jpg':
-			case 'jpeg':
-				imagejpeg( $new_image, $new_image_path );
-				break;
-		}
-		
-		imagedestroy($original_image);
-		imagedestroy($new_image);
 		
 		return $new_image_path;
 	}
@@ -317,6 +298,9 @@ class ImagesToolkit {
 	}
 	
 	private function replace_img_tags($img_tag, $src = false, $width = false, $height = false) {
+		if(is_string($img_tag)) {
+			$img_tag = str_get_html($img_tag)->find('img', 0);
+		}
 		if ($src) {
 			$img_tag->src = $src;
 		}
@@ -351,22 +335,10 @@ class ImagesToolkit {
 					
 					list($orig_w, $orig_h, $orig_type) = getimagesize($retina_file);
 					
-					$standard_image = imagecreatetruecolor($orig_w / 2, $orig_h / 2);
-					$image = wp_load_image($retina_file);
-					
-					// Resize
-					imagecopyresampled($standard_image, $image, 0, 0, 0, 0, $orig_w / 2, $orig_h / 2, $orig_w, $orig_h);
-					
-					switch ($orig_type) {
-						case IMAGETYPE_GIF:
-							imagegif( $standard_image, $standard_image_file );
-							break;
-						case IMAGETYPE_PNG:
-							imagepng( $standard_image, $standard_image_file, 0 );
-							break;
-						case IMAGETYPE_JPEG:
-							imagejpeg( $standard_image, $standard_image_file, 100 );
-							break;
+					$image = wp_get_image_editor( $retina_file );
+					if ( !is_wp_error( $image ) ) {
+						$image->resize( $orig_w / 2, $orig_h / 2, false );
+						$image->save( $standard_image_file );
 					}
 				}
 			}
@@ -394,11 +366,10 @@ class ImagesToolkit {
 	
 	public function alter_grayscale_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr) {
 		if($this->image_is_grayscale) {
-			preg_match("/(.*)<img(.*)src=\"([^\"]+)\"(.*)\/>(.*)/i", $html, $matches);
-			$standard_image_file = $matches[3];
-			$extension = pathinfo($standard_image_file, PATHINFO_EXTENSION);
+			$standard_image_file = wp_get_attachment_image_src($post_thumbnail_id, $size);
+			$extension = pathinfo($standard_image_file[0], PATHINFO_EXTENSION);
 			$grayscale_image_file = trailingslashit(dirname($standard_image_file)) . basename($standard_image_file, '.' . $extension) . '-gray.' . $extension;
-			$html = $matches[1] . '<img' . $matches[2] . 'src="' . $grayscale_image_file . '"'.  $matches[4] . '/>' . $matches[5];
+			$html = $this->replace_img_tags($html, $grayscale_image_file);
 		}
 		return $html;
 	} // end alter_grayscale_thumbnail_html
@@ -420,7 +391,7 @@ class ImagesToolkit {
 					
 					list($orig_w, $orig_h, $orig_type) = getimagesize($image_file);
 					
-					$image = wp_load_image($image_file);
+					$image =  imagecreatefromstring(file_get_contents($image_file));
 					
 					$grayscale_image = $image;
 					imagefilter($grayscale_image, IMG_FILTER_GRAYSCALE);
