@@ -91,12 +91,15 @@ class ImagesToolkit {
 			add_action( 'delete_attachment', array( $this, 'delete_grayscale_images'));
 		}
 		
+		if ($this->options['enable_retina']) {
+			add_action( 'after_setup_theme', array( $this, 'add_retina_images_sizes' ), 100 );
+			add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_thumbnails_from_retina_versions'), 99);
+		}
+		
 		if ($this->options['enable_retina'] || $this->options['enable_adaptive']) {
 			add_action( 'wp_head', array( $this, 'set_resolution_cookie' ) );
-			add_action( 'after_setup_theme', array( $this, 'add_retina_images_sizes' ), 100 );
 			add_filter( 'post_thumbnail_html', array( $this, 'alter_thumbnail_html' ), 100, 5 );
 			add_filter( 'the_content', array( $this, 'process_html_imgs' ), 100 );
-			add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_thumbnails_from_retina_versions'), 99);
 		}
         
         if (is_admin()) {
@@ -167,29 +170,34 @@ class ImagesToolkit {
 	 *---------------------------------------------*/
 	
 	public function alter_thumbnail_html($html, $post_id, $post_thumbnail_id, $size, $attr) {
+		$adaptive = false;
+		$retina = false;
+		
 		$imgdata = wp_get_attachment_image_src( $post_thumbnail_id, $size );
 		$url = $imgdata[0];
 		$html_width = $imgdata[1];
 		$html_height = $imgdata[2];
 		
-		/* TODO: Add a correspondence table to perfectly control images sizes depending on the context */
 		/* TODO: Switch / Find correspondences in available wordpress images formats */
 		
-		$adapted_image = $this->get_adapted_image($url, $html_width, $html_height);
-		if ($adapted_image) {
-			$url = $adapted_image['url'];
-			$html_width = $adapted_image['html_width'];
-			$html_height = $adapted_image['html_height'];
-		} else if ($this->retina_display) {
+		if ($this->options['enable_adaptive']) {
+			$adapted_image = $this->get_adapted_image($url, $html_width, $html_height);
+			if ($adapted_image) {
+				$adaptive = true;
+				$url = $adapted_image['url'];
+				$html_width = $adapted_image['html_width'];
+				$html_height = $adapted_image['html_height'];
+			}
+		} else if ($this->options['enable_retina'] && $this->retina_display) {
+			$retina = true;
 			$imgdata = wp_get_attachment_image_src( $post_thumbnail_id, $size . '-@2x' );
 			$url = $imgdata[0];
-			if ($this->image_is_grayscale) {
+			if ($this->options['enable_grayscale'] && $this->image_is_grayscale) {
 				$url = $this->get_grayscale_image($url);
 			}
 		}
 			
-		if ($this->retina_display || $adapted_image) {
-			$html = str_get_html($html);
+		if ($adaptive || $retina) {
 			$html = $this->replace_img_tags($html, $url, $html_width, $html_height);
 		}
 		return $html;
@@ -229,8 +237,8 @@ class ImagesToolkit {
 		if($original_width <= $this->screen['breakpoint']) {
 			return false;
 		}
-			
-		$html_width = $this->screen['breakpoint'];
+		
+		$html_width = $this->screen['image_resolution'];
 		$html_height = round($html_width * $original_height / $original_width);
 		
 		$new_width = $html_width;
@@ -256,7 +264,7 @@ class ImagesToolkit {
 		$adapted_image_file = $this->cache_path . '/' . $folder_prefix . $img_suffix;
 		$adapted_url = $this->cache_url . '/' . $folder_prefix . $img_suffix;
 		
-		if(!file_exists($adapted_image_file)) {
+		if(!file_exists($adapted_image_file) || $this->options['watch_cache']) {
 			$folder = dirname($adapted_image_file);
 			if(!file_exists($folder)) {
 				if(!mkdir($folder, 0777, true)) {
@@ -273,8 +281,9 @@ class ImagesToolkit {
 	}
 	
 	private function create_resampled_image($original_image_path, $new_image_path, $new_width, $new_height) {
-		$original_image = wp_get_image_editor( $original_image_path );
-		if ( !is_wp_error( $original_image ) ) {
+		$original_image = wp_get_image_editor($original_image_path);
+		if ( !is_wp_error($original_image) ) {
+			$original_image->set_quality($this->options['jpeg_quality']);
 			$original_image->resize( $new_width, $new_height, false );
 			$original_image->save( $new_image_path );
 		}
@@ -337,6 +346,7 @@ class ImagesToolkit {
 					
 					$image = wp_get_image_editor( $retina_file );
 					if ( !is_wp_error( $image ) ) {
+						$image->set_quality(100);
 						$image->resize( $orig_w / 2, $orig_h / 2, false );
 						$image->save( $standard_image_file );
 					}
@@ -368,7 +378,7 @@ class ImagesToolkit {
 		if($this->image_is_grayscale) {
 			$standard_image_file = wp_get_attachment_image_src($post_thumbnail_id, $size);
 			$extension = pathinfo($standard_image_file[0], PATHINFO_EXTENSION);
-			$grayscale_image_file = trailingslashit(dirname($standard_image_file)) . basename($standard_image_file, '.' . $extension) . '-gray.' . $extension;
+			$grayscale_image_file = trailingslashit(dirname($standard_image_file[0])) . basename($standard_image_file[0], '.' . $extension) . '-gray.' . $extension;
 			$html = $this->replace_img_tags($html, $grayscale_image_file);
 		}
 		return $html;

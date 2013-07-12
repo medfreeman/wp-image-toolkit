@@ -5,7 +5,7 @@ function is_mobile() {
   $userAgent = strtolower($_SERVER['HTTP_USER_AGENT']);
   return strpos($userAgent, 'mobile');
 }
-function get_screen_properties($resolutions) {
+function get_screen_properties($resolutions, $images_resolutions = false) {
 	/* Check to see if a valid cookie exists */
 	if (isset($_COOKIE['resolution'])) {
 	  $cookie_value = $_COOKIE['resolution'];
@@ -24,11 +24,18 @@ function get_screen_properties($resolutions) {
 
 		rsort($resolutions); // make sure the supplied break-points are in descending size order
 		$resolution = $resolutions[0]; // by default use the largest supported break-point -- 980
-
-		foreach ($resolutions as $break_point) { // filter down
-		  if ($client_width <= $break_point) {
-			$resolution = $break_point;
-		  }
+		if ($images_resolutions) {
+			$image_resolution = $images_resolutions[0];
+		}
+		
+		for($i=0;$i<sizeof($resolutions);$i++) { //filter down
+			$break_point = $resolutions[$i];
+			if ($client_width <= $break_point) {
+				$resolution = $break_point;
+				if ($images_resolutions) {
+					$image_resolution = $images_resolutions[$i];
+				}
+			}
 		}
 	  }
 	}
@@ -37,8 +44,11 @@ function get_screen_properties($resolutions) {
 	  // We send the lowest resolution for mobile-first approach, and highest otherwise
 	  $resolution = is_mobile() ? min($resolutions) : max($resolutions);
 	}
+	if(!$image_resolution) {
+		$image_resolution = $resolution;
+	}
 	if (!$pixel_density) {
 		$pixel_density = 1;
 	}
-	return array('width' => $client_width, 'breakpoint' => $resolution,  'pixel_density' => $pixel_density);
+	return array('width' => $client_width, 'breakpoint' => $resolution, 'image_resolution' => $image_resolution, 'pixel_density' => $pixel_density);
 }

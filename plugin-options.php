@@ -49,14 +49,15 @@
   $options_panel->addCheckbox('enable_adaptive',array('name'=> __('Enable adaptive images support ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std' => false, 'desc' => __('Creates adaptive images automatically when source image is bigger than screen.',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
   
   $options_panel->addText('breakpoints', array('name'=> __('Breakpoints ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std'=> '1024,800', 'validate_func' => 'validate_comma_numeric', 'desc' => __('Enter your resolution breakpoints in descending order, comma-separated (screen widths, in pixels)',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
+  $options_panel->addText('breakpoints_images_sizes', array('name'=> __('Breakpoints sizes',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std'=> '1024,800', 'validate_func' => 'validate_comma_numeric', 'desc' => __('Enter your resolution breakpoints corresponding images sizes in descending order, comma-separated (widths, in pixels)',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
   $options_panel->addText('jpeg_quality', array('name'=> __('JPEG quality ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std'=> '70', 'validate' => array(
           'minvalue' => array('param' => 1,'message' => __('must be numeric with a min value of 1',WP_IMAGE_TOOLKIT_TEXTDOMAIN)),
           'maxvalue' => array('param' => 100,'message' => __('must be numeric with a max value of 100',WP_IMAGE_TOOLKIT_TEXTDOMAIN))
       ), 'desc' => __('Image quality for generated jpegs (1-100)',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
-  $options_panel->addCheckbox('sharpen_images',array('name'=> __('Sharpen Images ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std' => true, 'desc' => __('Shrinking images can blur details, perform a sharpen on re-scaled images ?',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
+  //$options_panel->addCheckbox('sharpen_images',array('name'=> __('Sharpen Images ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std' => true, 'desc' => __('Shrinking images can blur details, perform a sharpen on re-scaled images ?',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
   $options_panel->addText('cache_path', array('name'=> __('Cache path ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std'=> 'wp-content/ai-cache', 'validate_func' => 'validate_path_exists', 'desc' => __('Where to store the generated re-sized images (no starting and trailing slashes).<br/>Specify from your wordpress base directory !',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
   $options_panel->addCheckbox('watch_cache',array('name'=> __('Watch cache ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std' => false, 'desc' => __('Ensures updated source images are re-cached',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
-  $options_panel->addText('browser_cache_duration', array('name'=> __('Cache duration ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std'=> '60*60*24*7', 'validate' => 'numeric', 'desc' => __('How long will the visitor\'s browser cache the image (seconds) ?<br/>Default: 7 days',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
+  //$options_panel->addText('browser_cache_duration', array('name'=> __('Cache duration ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std'=> '60*60*24*7', 'validate' => 'numeric', 'desc' => __('How long will the visitor\'s browser cache the image (seconds) ?<br/>Default: 7 days',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
   
   /*//text field
   $options_panel->addText('text_field_id', array('name'=> __('My Text ',WP_IMAGE_TOOLKIT_TEXTDOMAIN), 'std'=> 'text', 'desc' => __('Simple text field description',WP_IMAGE_TOOLKIT_TEXTDOMAIN)));
