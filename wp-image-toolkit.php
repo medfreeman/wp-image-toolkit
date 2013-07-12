@@ -172,8 +172,6 @@ class ImagesToolkit {
 		$html_width = $imgdata[1];
 		$html_height = $imgdata[2];
 		
-		/* TODO: Same for post images */
-		
 		/* TODO: Add a correspondence table to perfectly control images sizes depending on the context */
 		/* TODO: Switch / Find correspondences in available wordpress images formats */
 		
