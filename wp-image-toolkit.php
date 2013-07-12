@@ -75,7 +75,8 @@ class ImagesToolkit {
 		add_action( 'init', array( $this, 'plugin_textdomain' ) );
 		
 		$this->resolutions = explode(',', $this->options['breakpoints']);
-		$this->screen = get_screen_properties($this->resolutions);
+		$this->image_resolutions = explode(',', $this->options['breakpoints_images_sizes']);
+		$this->screen = get_screen_properties($this->resolutions, $this->image_resolutions);
 		
 		$this->retina_display = ($this->screen['pixel_density'] >= 1.5);
 		
