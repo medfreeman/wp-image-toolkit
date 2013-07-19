@@ -310,7 +310,7 @@ class ImagesToolkit {
 	private function replace_img_tags($img_tag, $src = false, $width = false, $height = false) {
 		if(is_string($img_tag)) {
 			$img_tag = str_get_html($img_tag);
-			if(!is_object($img_tag)) { 
+			if(!is_object($img_tag)) {
 				return $img_tag;
 			}
 		}
