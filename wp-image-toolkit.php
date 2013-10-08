@@ -3,7 +3,7 @@
 Plugin Name: Wordpress Image Toolkit
 Plugin URI: http://www.superposition.info
 Description: Adaptive, retina, and grayscale images support.
-Version: 1.3.0
+Version: 1.4.0
 Author: Mehdi Lahlou
 Author URI: http://www.superposition.info
 Author Email: mehdi.lahlou@free.fr
