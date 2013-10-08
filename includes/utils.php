@@ -3,7 +3,7 @@
    NOTE: only used in the event a cookie isn't available. */
 function is_mobile() {
   $userAgent = strtolower($_SERVER['HTTP_USER_AGENT']);
-  return strpos($userAgent, 'mobile');
+  return stripos($userAgent, 'mobile') !== false;
 }
 function get_screen_properties($resolutions, $images_resolutions = false) {
 	/* Check to see if a valid cookie exists */
@@ -44,8 +44,8 @@ function get_screen_properties($resolutions, $images_resolutions = false) {
 	  // We send the lowest resolution for mobile-first approach, and highest otherwise
 	  $resolution = is_mobile() ? min($resolutions) : max($resolutions);
 	}
-	if(!$image_resolution) {
-		$image_resolution = $resolution;
+	if(!$client_width || !$image_resolution) {
+		$client_width = $image_resolution = $resolution;
 	}
 	if (!$pixel_density) {
 		$pixel_density = 1;

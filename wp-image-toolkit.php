@@ -76,7 +76,9 @@ class ImagesToolkit {
 		
 		$this->resolutions = explode(',', $this->options['breakpoints']);
 		$this->image_resolutions = explode(',', $this->options['breakpoints_images_sizes']);
-		$this->screen = get_screen_properties($this->resolutions, $this->image_resolutions);
+		
+		global $screen;
+		$screen = $this->screen = get_screen_properties($this->resolutions, $this->image_resolutions);
 		
 		$this->retina_display = ($this->screen['pixel_density'] >= 1.5);
 		
@@ -103,7 +105,7 @@ class ImagesToolkit {
 			add_filter( 'the_content', array( $this, 'process_html_imgs' ), 100 );
 		}
         
-        if (is_admin()) {
+        if (is_admin() && (!defined('DOING_AJAX') || !DOING_AJAX)) {
 			add_filter('apc_validattion_class_name', array( $this, 'custom_validation_class' ), 10, 2);
 		} else {
 			require_once("includes/simple_html_dom.php");
@@ -309,10 +311,7 @@ class ImagesToolkit {
 	
 	private function replace_img_tags($img_tag, $src = false, $width = false, $height = false) {
 		if(is_string($img_tag)) {
-			$img_tag = str_get_html($img_tag);
-			if(!is_object($img_tag)) {
-				return $img_tag;
-			}
+			$img_tag = str_get_html($img_tag)->find('img', 0);
 		}
 		if ($src) {
 			$img_tag->src = $src;
