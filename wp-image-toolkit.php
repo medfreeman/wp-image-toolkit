@@ -102,7 +102,11 @@ class ImagesToolkit {
 		if ($this->options['enable_retina'] || $this->options['enable_adaptive']) {
 			add_action( 'wp_head', array( $this, 'set_resolution_cookie' ) );
 			add_filter( 'post_thumbnail_html', array( $this, 'alter_thumbnail_html' ), 100, 5 );
+			add_filter( 'the_content', array( $this, 'reset_grayscale_flag' ), 99 );
 			add_filter( 'the_content', array( $this, 'process_html_imgs' ), 100 );
+			add_filter( 'wpit_html_images', array( $this, 'reset_grayscale_flag' ), 9, 2 );
+			add_filter( 'wpit_html_images', array( $this, 'process_html_imgs' ), 10, 2 );
+			add_filter( 'wpit_image', array( $this, 'process_img' ), 10, 2 );
 		}
         
         if (is_admin() && (!defined('DOING_AJAX') || !DOING_AJAX)) {
@@ -121,7 +125,7 @@ class ImagesToolkit {
 				'zip_url' => 'https://github.com/medfreeman/wp-image-toolkit/zipball/master', // the zip url of the github repo
 				'sslverify' => true, // wether WP should check the validity of the SSL cert when getting an update, see https://github.com/jkudish/WordPress-GitHub-Plugin-Updater/issues/2 and https://github.com/jkudish/WordPress-GitHub-Plugin-Updater/issues/4 for details
 				'requires' => '3.5', // which version of WordPress does your plugin require?
-				'tested' => '3.5.2', // which version of WordPress is your plugin tested up to?
+				'tested' => '3.6.1', // which version of WordPress is your plugin tested up to?
 				'readme' => 'README.md', // which file to use as the readme for the version number
 				'access_token' => '' // Access private repositories by authorizing under Appearance > Github Updates when this example plugin is installed
 			);
@@ -206,7 +210,34 @@ class ImagesToolkit {
 		return $html;
 	}
 	
-	public function process_html_imgs($html) {
+	public function process_img($url, $new_width) {
+		if(empty($url)) {
+			return $url;
+		}
+		
+		$this->image_is_grayscale = false;
+		
+		$original_image_file = ABSPATH . $this->get_relative_path_from_url($url);
+		$imgdata = getimagesize($original_image_file);
+			
+		$orig_width = $imgdata[0];
+		$orig_height = $imgdata[1];
+		
+		$adapted_image = $this->get_adapted_image($url, $orig_width, $orig_height , $new_width);
+		
+		if ($adapted_image) {
+			return $adapted_image;	
+		}
+		
+		return $url;
+	}
+	
+	public function reset_grayscale_flag($html) {
+		$this->image_is_grayscale = false;
+		return $html;
+	}
+	
+	public function process_html_imgs($html, $new_width = false) {
 		if(empty($html)) {
 			return $html;
 		}
@@ -224,8 +255,15 @@ class ImagesToolkit {
 			$orig_width = $imgdata[0];
 			$orig_height = $imgdata[1];
 			
-			$html_width = isset($img_tag->width) ? $img_tag->width : $orig_width;
-			$html_height = isset($img_tag->height) ? $img_tag->height : $orig_height;
+			if (!$new_width) {
+				$html_width = isset($img_tag->width) ? $img_tag->width : $orig_width;
+				$html_height = isset($img_tag->height) ? $img_tag->height : $orig_height;
+			} else {
+				$html_width = $new_width;
+				$tmp_width = isset($img_tag->width) ? $img_tag->width : $orig_width;
+				$tmp_height = isset($img_tag->height) ? $img_tag->height : $orig_height;
+				$html_height = round($html_width * $tmp_height / $tmp_width);
+			}
 			
 			$adapted_image = $this->get_adapted_image($url, $html_width, $html_height);
 			if ($adapted_image) {
@@ -236,18 +274,23 @@ class ImagesToolkit {
 		return $html;
 	}
 	
-	private function get_adapted_image($original_url, $original_width, $original_height) {
+	private function get_adapted_image($original_url, $original_width, $original_height, $html_width = false) {
 		if($original_width <= $this->screen['breakpoint']) {
 			return false;
 		}
 		
-		$html_width = $this->screen['image_resolution'];
+		if (!$html_width) {
+			$html_width = $this->screen['image_resolution'];
+			$folder_prefix = $this->screen['breakpoint'];
+		} else {
+			$folder_prefix = $html_width;
+		}
 		$html_height = round($html_width * $original_height / $original_width);
 		
 		$new_width = $html_width;
 		$new_height = $html_height;
 		
-		$folder_prefix = $this->screen['breakpoint'];
+		
 		if ($this->retina_display) {
 			$folder_prefix .= '-@2x';
 			$new_width = $new_width * 2;
