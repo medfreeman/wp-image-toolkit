@@ -96,7 +96,7 @@ class ImagesToolkit {
 		
 		if ($this->options['enable_retina']) {
 			add_action( 'after_setup_theme', array( $this, 'add_retina_images_sizes' ), 100 );
-			add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_thumbnails_from_retina_versions'), 99);
+			add_filter( 'wp_update_attachment_metadata', array( $this, 'generate_thumbnails_from_retina_versions'), 99, 2);
 		}
 		
 		if ($this->options['enable_retina'] || $this->options['enable_adaptive']) {
@@ -373,7 +373,7 @@ class ImagesToolkit {
 	 * Downscale by 2x every retina image to generate standard ones
 	 *---------------------------------------------*/
 	
-	public function generate_thumbnails_from_retina_versions($meta) {
+	public function generate_thumbnails_from_retina_versions( $meta, $attachment_id ) {
 		$upload_dir = wp_upload_dir();
 		
 		$sizes = array();
