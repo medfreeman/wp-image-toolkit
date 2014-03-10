@@ -109,10 +109,10 @@ class ImagesToolkit {
 			add_filter( 'wpit_image', array( $this, 'process_img' ), 10, 2 );
 		}
         
-        if (is_admin() && (!defined('DOING_AJAX') || !DOING_AJAX)) {
-			add_filter('apc_validattion_class_name', array( $this, 'custom_validation_class' ), 10, 2);
+        if ( is_admin() && ( !defined('DOING_AJAX') ) ) {
+			add_filter( 'apc_validattion_class_name', array( $this, 'custom_validation_class' ), 10, 2);
 		} else {
-			require_once("includes/simple_html_dom.php");
+			include_once("includes/simple_html_dom.php");
 		}
         
         if (is_admin()) { // note the use of is_admin() to double check that this is happening in the admin
@@ -271,7 +271,7 @@ class ImagesToolkit {
 			}
 		}
 		
-		return $html;
+		return $html->save();
 	}
 	
 	private function get_adapted_image($original_url, $original_width, $original_height, $html_width = false) {
