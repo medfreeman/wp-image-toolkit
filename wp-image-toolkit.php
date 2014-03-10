@@ -523,9 +523,11 @@ class ImagesToolkit {
 		if (isset($_wp_additional_image_sizes[$size])) {
 			$width = intval($_wp_additional_image_sizes[$size]['width']);
 			$height = intval($_wp_additional_image_sizes[$size]['height']);
+			$crop = intval($_wp_additional_image_sizes[$size]['crop']);
 		} else {
 			$width = get_option($size.'_size_w');
 			$height = get_option($size.'_size_h');
+			$crop = get_option($size.'_crop');
 		}
 		return array($width, $height, $crop);
 	}
