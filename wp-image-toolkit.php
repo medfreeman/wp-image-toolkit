@@ -90,7 +90,7 @@ class ImagesToolkit {
 		if ($this->options['enable_grayscale']) {
 			add_filter( 'post_thumbnail_size', array( $this, 'apply_grayscale_thumbnail' ), 99 );
 			add_filter( 'post_thumbnail_html', array( $this, 'alter_grayscale_thumbnail_html' ), 99, 5 );
-			add_filter( 'wp_generate_attachment_metadata', array( $this, 'generate_grayscale_images'), 100);
+			add_filter( 'wp_update_attachment_metadata', array( $this, 'generate_grayscale_images'), 100, 2);
 			add_action( 'delete_attachment', array( $this, 'delete_grayscale_images'));
 		}
 		
@@ -434,7 +434,7 @@ class ImagesToolkit {
 	 * Generate grayscale images on media manager upload
 	 *---------------------------------------------*/
 	
-	public function generate_grayscale_images($meta) {
+	public function generate_grayscale_images( $meta, $attachment_id ) {
 		$sizes = $this->get_images_sizes_files($meta);
 		
 		$upload_dir = wp_upload_dir();
